@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <title>ShilpSahayak | Buyer Platform</title>
+
+  <!-- Google Fonts & Phosphor Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <!-- Supabase JS Client v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="app-canvas">
+    
+    <!-- Top Global Header -->
+    <header class="navbar-header">
+      <div class="site-container">
+        <div class="nav-inner">
+          <div class="brand-cluster" id="btnGoHome">
+            <div class="brand-logo-disc">
+              <i class="ph-bold ph-sketch-logo"></i>
+            </div>
+            <span class="brand-name">ShilpSahayak</span>
+          </div>
+
+          <!-- Desktop Navigation Tabs (Visible on > 768px) -->
+          <nav class="desktop-nav-links">
+            <button class="nav-link-btn active" data-tab="home"><i class="ph-fill ph-house"></i> Home</button>
+            <button class="nav-link-btn" data-tab="explore"><i class="ph-bold ph-magnifying-glass"></i> Explore</button>
+            <button class="nav-link-btn" data-tab="orders"><i class="ph-bold ph-receipt"></i> Orders</button>
+            <button class="nav-link-btn" data-tab="profile"><i class="ph-bold ph-user"></i> Profile</button>
+          </nav>
+
+          <div class="nav-actions">
+            <!-- Live Connection Pill -->
+            <div class="live-status-pill" id="btnOpenDbModal" title="Click to view/change Supabase configuration">
+              <span class="indicator-dot" id="liveIndicatorDot"></span>
+              <span class="status-label" id="liveStatusText">Syncing...</span>
+            </div>
+
+            <button class="nav-icon-btn" id="btnCartTrigger" aria-label="Shopping Cart">
+              <i class="ph-bold ph-shopping-cart-simple"></i>
+              <span class="badge-count" id="cartCount">0</span>
+            </button>
+            <button class="nav-icon-btn" id="btnRefreshData" aria-label="Refresh Database">
+              <i class="ph-bold ph-arrows-clockwise" id="refreshIcon"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Viewport Container Wrapped in site-container -->
+    <main class="content-view-port">
+      <div class="site-container">
+
+        <!-- 1. HOME SCREEN -->
+        <section id="view-home" class="app-view active">
+          <!-- Hero Card -->
+          <div class="hero-card">
+            <div class="hero-mask"></div>
+            <div class="hero-body">
+              <div class="hero-tag"><i class="ph-fill ph-sparkle"></i> ShilpSahayak Verified</div>
+              <h1 class="hero-title">Discover India's Cultural Treasures</h1>
+              <p class="hero-tagline">Ancient traditions, verified master artisans.</p>
+              <button class="hero-cta-btn" id="btnHeroExplore">
+                Explore Now <i class="ph-bold ph-arrow-right"></i>
+              </button>
+            </div>
+            <div class="hero-indicators">
+              <span class="indicator-bar active"></span>
+              <span class="indicator-bar"></span>
+              <span class="indicator-bar"></span>
+            </div>
+          </div>
+
+          <!-- Popular Categories Section -->
+          <div class="section-heading-bar">
+            <h2 class="section-heading">Popular Categories</h2>
+          </div>
+          
+          <div class="category-rack" id="homeCategoryRack">
+            <div class="cat-pill active" data-category="ALL">
+              <div class="cat-pill-icon"><i class="ph-bold ph-infinity"></i></div>
+              <span class="cat-pill-name">All</span>
+            </div>
+            <div class="cat-pill" data-category="Tribal Art / Toys">
+              <div class="cat-pill-icon"><i class="ph-bold ph-shapes"></i></div>
+              <span class="cat-pill-name">Tribal Art / Toys</span>
+            </div>
+            <div class="cat-pill" data-category="Terracotta Craft">
+              <div class="cat-pill-icon"><i class="ph-bold ph-drop"></i></div>
+              <span class="cat-pill-name">Terracotta Craft</span>
+            </div>
+            <div class="cat-pill" data-category="Dhokra Metal Craft">
+              <div class="cat-pill-icon"><i class="ph-bold ph-knife"></i></div>
+              <span class="cat-pill-name">Dhokra Metal Craft</span>
+            </div>
+            <div class="cat-pill" data-category="Handloom Silk">
+              <div class="cat-pill-icon"><i class="ph-bold ph-fingerprint"></i></div>
+              <span class="cat-pill-name">Handloom Silk</span>
+            </div>
+          </div>
+
+          <!-- Artisan Showcase Grid -->
+          <div class="section-heading-bar split">
+            <h2 class="section-heading">Artisan Showcase</h2>
+            <button class="text-link-btn" id="btnReloadShowcase">
+              <i class="ph-bold ph-arrows-clockwise"></i> Reload
+            </button>
+          </div>
+
+          <div class="products-grid" id="homeShowcaseGrid">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- 2. EXPLORE SCREEN -->
+        <section id="view-explore" class="app-view">
+          <div class="search-input-wrapper">
+            <i class="ph-bold ph-magnifying-glass input-icon"></i>
+            <input type="search" id="searchInput" placeholder="Search craft, cluster, or material..." autocomplete="off" />
+          </div>
+
+          <div class="horizontal-scroll-chips" id="exploreChipsRow">
+            <button class="filter-chip active" data-category="ALL">All Crafts</button>
+            <button class="filter-chip" data-category="Tribal Art / Toys">Tribal Art</button>
+            <button class="filter-chip" data-category="Terracotta Craft">Terracotta</button>
+            <button class="filter-chip" data-category="Dhokra Metal Craft">Dhokra Metal</button>
+            <button class="filter-chip" data-category="Handloom Silk">Handloom</button>
+          </div>
+
+          <div class="products-grid" id="exploreProductGrid">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- 3. ORDERS SCREEN -->
+        <section id="view-orders" class="app-view">
+          <div class="section-heading-bar">
+            <h2 class="section-heading">Orders &amp; Escrow Tracking</h2>
+            <p class="section-subtext">Verified on ONDC Protocol. Monitored by MoSJE guidelines.</p>
+          </div>
+
+          <div class="orders-feed" id="ordersListWrapper">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <!-- 4. PROFILE SCREEN -->
+        <section id="view-profile" class="app-view">
+          <div class="profile-wrapper">
+            <div class="patron-gold-pass">
+              <div class="patron-card-header">
+                <div class="patron-tag"><i class="ph-bold ph-crown"></i> MoSJE Cultural Patron Pass</div>
+                <span class="badge-patron-verified"><i class="ph-fill ph-check-circle"></i> Verified</span>
+              </div>
+              <h2 class="patron-title" id="profilePatronName">buyer1</h2>
+              <p class="patron-statement">Empowering Rural Artisans &amp; Traditional Indian Handcrafts</p>
+              <div class="patron-card-footer">
+                <span id="profilePatronContact">Contact: +91 89176 00253</span>
+                <span>Fair-Trade Tier: <strong>Gold</strong></span>
+              </div>
+            </div>
+
+            <div class="kpi-panel">
+              <div class="kpi-item">
+                <i class="ph-bold ph-bag"></i>
+                <span class="kpi-value" id="kpiOrderCount">0</span>
+                <span class="kpi-label">Orders</span>
+              </div>
+              <div class="kpi-divider"></div>
+              <div class="kpi-item">
+                <i class="ph-bold ph-heart-straight"></i>
+                <span class="kpi-value" id="kpiArtisanCount">0</span>
+                <span class="kpi-label">Artisans Backed</span>
+              </div>
+              <div class="kpi-divider"></div>
+              <div class="kpi-item">
+                <i class="ph-bold ph-shield-check"></i>
+                <span class="kpi-value">100%</span>
+                <span class="kpi-label">Escrow Status</span>
+              </div>
+            </div>
+
+            <div class="profile-links-list">
+              <button class="profile-nav-row" onclick="alert('Primary Destination:\nCraft Nagar, Lane 4, Bhubaneswar, Odisha - 751024')">
+                <div class="row-icon-disc"><i class="ph-bold ph-map-pin"></i></div>
+                <div class="row-text">
+                  <strong>Saved Shipping Addresses</strong>
+                  <small>Manage domestic &amp; international destinations</small>
+                </div>
+                <i class="ph-bold ph-caret-right chevron"></i>
+              </button>
+
+              <button class="profile-nav-row" onclick="alert('Escrow Vault active with Postman COD verification and UPI instant settlement.')">
+                <div class="row-icon-disc"><i class="ph-bold ph-wallet"></i></div>
+                <div class="row-text">
+                  <strong>Payment Methods &amp; Escrow Vault</strong>
+                  <small>UPI, Cards, and Postman COD verification</small>
+                </div>
+                <i class="ph-bold ph-caret-right chevron"></i>
+              </button>
+
+              <button class="profile-nav-row" onclick="alert('Active Regional Locale: English (India) - Currency: INR (₹)')">
+                <div class="row-icon-disc"><i class="ph-bold ph-globe"></i></div>
+                <div class="row-text">
+                  <strong>App Language &amp; Currency</strong>
+                  <small>English (INR ₹ / Global auto-convert)</small>
+                </div>
+                <i class="ph-bold ph-caret-right chevron"></i>
+              </button>
+
+              <button class="profile-nav-row" onclick="alert('MoSJE Artisan Helpdesk: 1800-SHILP-AID\nDirect grievance settlement within 24 hours.')">
+                <div class="row-icon-disc"><i class="ph-bold ph-headset"></i></div>
+                <div class="row-text">
+                  <strong>Artisan Trust &amp; Support Desk</strong>
+                  <small>Direct resolution backed by MoSJE guidelines</small>
+                </div>
+                <i class="ph-bold ph-caret-right chevron"></i>
+              </button>
+            </div>
+
+            <button class="btn-signout" onclick="showToast('Logged in as Cultural Patron: buyer1')">
+              <i class="ph-bold ph-sign-out"></i> Log Out from ShilpSahayak
+            </button>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Floating AI Prompt Button -->
+    <button class="btn-ask-ai-floating" id="btnTriggerAi">
+      <i class="ph-fill ph-sparkle"></i>
+      <span>Ask AI Guide</span>
+    </button>
+
+    <!-- Mobile Bottom Dock Navigation -->
+    <nav class="bottom-dock-nav">
+      <button class="dock-btn active" data-tab="home"><i class="ph-fill ph-house"></i><span>Home</span></button>
+      <button class="dock-btn" data-tab="explore"><i class="ph-bold ph-magnifying-glass"></i><span>Explore</span></button>
+      <button class="dock-btn" data-tab="orders"><i class="ph-bold ph-receipt"></i><span>Orders</span></button>
+      <button class="dock-btn" data-tab="profile"><i class="ph-bold ph-user"></i><span>Profile</span></button>
+    </nav>
+  </div>
+
+  <!-- MODALS & POPUPS -->
+
+  <!-- Product Detail Modal -->
+  <div class="modal-layer" id="modalProductDetail">
+    <div class="modal-card">
+      <div class="modal-top-bar">
+        <button class="nav-icon-btn btn-sm" id="btnCloseDetail"><i class="ph-bold ph-caret-left"></i></button>
+        <div class="modal-brand-title">
+          <div class="brand-logo-disc micro"><i class="ph-bold ph-sketch-logo"></i></div>
+          <span>ShilpSahayak</span>
+        </div>
+        <div class="top-bar-side">
+          <button class="nav-icon-btn btn-sm" id="btnDetailFav"><i class="ph-bold ph-heart" id="detailFavIcon"></i></button>
+          <button class="nav-icon-btn btn-sm" id="btnDetailShare"><i class="ph-bold ph-share-network"></i></button>
+        </div>
+      </div>
+
+      <div class="modal-scroll-area">
+        <div class="modal-hero-image"><img id="dtlImage" src="" alt="Craft Hero Image" /></div>
+        <div class="detail-container">
+          <div class="detail-name-row">
+            <h2 id="dtlTitle">Handcrafted Rural Craft</h2>
+            <span class="badge-mosje-cert"><i class="ph-fill ph-seal-check"></i> MoSJE Certified</span>
+          </div>
+          <div class="detail-cost-row">
+            <span class="amount-val" id="dtlPrice">₹0</span>
+            <span class="badge-fair-benchmark" id="dtlWageBenchmark">Fair-Trade Benchmark</span>
+          </div>
+          <p class="settlement-meta">Direct artisan bank settlement • Zero platform commission</p>
+
+          <div class="artisan-badge-card">
+            <div class="artisan-badge-avatar"><i class="ph-fill ph-user"></i></div>
+            <div>
+              <h4 id="dtlArtisan">Master Artisan: -</h4>
+              <p id="dtlClusterDetail">Cluster: - • 4 hours of manual devotion</p>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="card-caption"><i class="ph-bold ph-package"></i> Technical Specifications</div>
+            <div class="card-body-text" id="dtlSpecs">
+              Material: Natural clay and organic earthen minerals.<br>
+              Technique: Ancestral hand-molding and wood-kiln firing.<br>
+              Care Instructions: Keep dry, avoid harsh abrasives.
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="card-caption"><i class="ph-bold ph-book-open"></i> Cultural Lineage &amp; Heritage Story</div>
+            <p class="card-body-text" id="dtlStory">Preserved across generations by rural master artisans.</p>
+          </div>
+
+          <div class="section-heading-bar">
+            <h3 class="section-heading text-sm">You May Also Like</h3>
+          </div>
+          <div class="mini-card-scroller" id="dtlRelatedContainer"></div>
+        </div>
+      </div>
+
+      <div class="modal-action-dock">
+        <button class="btn-dock-cart" id="btnAddItemCart"><i class="ph-bold ph-shopping-cart-simple"></i> Add to Cart</button>
+        <button class="btn-dock-buy" id="btnInitiateBuy"><i class="ph-bold ph-lightning"></i> Buy Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Secure Checkout Modal -->
+  <div class="modal-layer" id="modalCheckout">
+    <div class="modal-card">
+      <div class="modal-top-bar">
+        <button class="nav-icon-btn btn-sm" id="btnCloseCheckout"><i class="ph-bold ph-arrow-left"></i></button>
+        <div class="modal-brand-title">
+          <div class="brand-logo-disc micro"><i class="ph-bold ph-sketch-logo"></i></div>
+          <span>Secure Checkout</span>
+        </div>
+        <div style="width:32px;"></div>
+      </div>
+
+      <div class="modal-scroll-area">
+        <div class="checkout-summary-box">
+          <div class="summary-icon"><i class="ph-bold ph-bag"></i></div>
+          <div class="summary-meta">
+            <strong id="chkSummaryTitle">Handcrafted Rural Craft</strong>
+            <small id="chkSummaryArtisan">Artisan: Subodh Karmakar</small>
+          </div>
+          <div class="summary-price" id="chkSummaryAmount">₹0</div>
+        </div>
+
+        <form id="orderCheckoutForm" class="checkout-form-body">
+          <h4 class="form-title">International &amp; Domestic Shipping Address</h4>
+          <div class="form-field">
+            <label>Country / Destination</label>
+            <select class="form-input" id="chkCountry">
+              <option value="India">India</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Germany">Germany</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Full Recipient Name</label>
+            <input type="text" class="form-input" id="chkRecipientName" value="Cultural Patron" required />
+          </div>
+          <div class="form-field">
+            <label>Street Address / House No.</label>
+            <input type="text" class="form-input" id="chkAddressLine" value="Craft Nagar, Lane 4" required />
+          </div>
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>City / State</label>
+              <input type="text" class="form-input" id="chkCityState" value="Bhubaneswar, Odisha" required />
+            </div>
+            <div class="form-field">
+              <label>ZIP / Postal Code</label>
+              <input type="text" class="form-input" id="chkPostalCode" value="751024" required />
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Contact Phone</label>
+            <input type="tel" class="form-input" id="chkPhone" value="+91 89176 00253" required />
+          </div>
+
+          <h4 class="form-title">Select Payment Method</h4>
+          <div class="payment-selection-list">
+            <label class="pay-method-option">
+              <div class="method-info">
+                <i class="ph-bold ph-qr-code"></i>
+                <span>Instant UPI / QR (Google Pay, PhonePe, Paytm)</span>
+              </div>
+              <input type="radio" name="paymentOption" value="UPI" checked />
+            </label>
+            <label class="pay-method-option">
+              <div class="method-info">
+                <i class="ph-bold ph-credit-card"></i>
+                <span>International Card (Visa, MasterCard, Amex)</span>
+              </div>
+              <input type="radio" name="paymentOption" value="CARD" />
+            </label>
+            <label class="pay-method-option">
+              <div class="method-info">
+                <i class="ph-bold ph-truck"></i>
+                <span>Cash on Delivery (Verified Postman Escrow)</span>
+              </div>
+              <input type="radio" name="paymentOption" value="COD" />
+            </label>
+          </div>
+
+          <button type="submit" class="btn-execute-pay" id="btnConfirmEscrowOrder">
+            <i class="ph-bold ph-lock-key"></i> Confirm &amp; Pay <span id="btnPayLabelAmount">₹0</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart Drawer -->
+  <div class="modal-layer" id="modalCartDrawer">
+    <div class="modal-card mini-sheet">
+      <div class="modal-top-bar">
+        <button class="nav-icon-btn btn-sm" id="btnCloseCart"><i class="ph-bold ph-x"></i></button>
+        <h3 style="font-size: 1rem; font-weight:800; color:var(--clr-maroon);">Your Cultural Bag</h3>
+        <div style="width:32px;"></div>
+      </div>
+      <div class="cart-items-scroller" id="cartContentContainer"></div>
+      <div class="cart-dock-footer">
+        <div class="cart-tally-line">
+          <span>Escrow Subtotal:</span>
+          <strong id="cartSubtotalValue">₹0</strong>
+        </div>
+        <button class="btn-execute-pay" id="btnCartProceedCheckout" style="margin-top:10px;">Proceed to Escrow Checkout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Assistant Sheet -->
+  <div class="modal-layer" id="modalAiAssistant">
+    <div class="modal-card mini-sheet">
+      <div class="modal-top-bar">
+        <button class="nav-icon-btn btn-sm" id="btnCloseAiAssistant"><i class="ph-bold ph-x"></i></button>
+        <div class="modal-brand-title">
+          <i class="ph-fill ph-sparkle" style="color:var(--clr-gold);"></i>
+          <span>Cultural AI Heritage Guide</span>
+        </div>
+        <div style="width:32px;"></div>
+      </div>
+      <div class="ai-discussion-body" id="aiDiscussionContainer">
+        <div class="chat-bubble bot">
+          <strong>Namaste! 🙏</strong>
+          <p>I am your ShilpSahayak Heritage Guide. Ask me about Indian GI-tagged handicrafts, fair-trade wage structures, or specific regional artisan lineages.</p>
+        </div>
+      </div>
+      <div class="ai-compose-bar">
+        <input type="text" id="aiPromptInput" placeholder="Ask about Bastar Dhokra, Bankura clay..." />
+        <button id="btnSubmitAiPrompt"><i class="ph-bold ph-paper-plane-right"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase Settings Modal -->
+  <div class="modal-layer" id="modalSupabaseConfig">
+    <div class="modal-card mini-sheet">
+      <div class="modal-top-bar">
+        <button class="nav-icon-btn btn-sm" id="btnCloseDbModal"><i class="ph-bold ph-x"></i></button>
+        <h3 style="font-size: 1rem; font-weight: 800;">Live Supabase Config</h3>
+        <div style="width:32px;"></div>
+      </div>
+      <div class="db-config-content">
+        <p class="hint-copy">Connect directly to your Supabase tables (<code>products</code>, <code>orders</code>, <code>profiles</code>).</p>
+        <div class="form-field">
+          <label>Supabase Project URL</label>
+          <input type="url" class="form-input" id="cfgUrlInput" placeholder="https://kwjjtocisauotehkpdwl.supabase.co" />
+        </div>
+        <div class="form-field">
+          <label>Supabase Public Anon Key</label>
+          <input type="password" class="form-input" id="cfgKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+        </div>
+        <div class="live-connection-card">
+          <div class="status-indicator-circle" id="modalStatusDot"></div>
+          <div class="status-details">
+            <strong id="modalConnectionStatus">Connecting...</strong>
+            <small id="modalSubstatus">Syncing real-time records</small>
+          </div>
+        </div>
+        <button class="btn-execute-pay" id="btnSaveDbConfig" style="margin-top:16px;">Save &amp; Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="floating-toast" id="toastMessage">Action completed successfully</aside>
+
+  <script src="app.js"></script>
+</body>
+</html>
