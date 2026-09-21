@@ -1,835 +1,973 @@
 /**
- * ShilpSahayak Buyer Application Logic
- * Integrates directly with Supabase v2, ONDC Beckn Protocol schemas, and MoSJE guidelines
+ * ShilpSahayak Buyer Platform Client Engine (app.js)
+ * Full Supabase Schema Alignment, Dual-Key Product Thumbnails & Interactive Order Tracking System
  */
 
-// Production Supabase Project Parameters (Pre-configured to your schema)
-const DEFAULT_SUPABASE_URL = "https://kwjjtocisauotehkpdwl.supabase.co";
-// Paste your Supabase project's Public Anon Key here (or enter it in the top settings modal)
-const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_XHnwUNs7wxb0fDn_5U_EJg_9uhRm3Q2";
+const SUPABASE_URL = "https://kwjjtocisauotehkpdwl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_XHnwUNs7wxb0fDn_5U_EJg_9uhRm3Q2";
 
-// Known Buyer Identity for Escrow Linking from your profiles table
-const ACTIVE_BUYER = {
-  id: "b7153f6b-71ad-4cda-ba4e-3a7b6946bfd1",
-  full_name: "buyer1",
-  phone: "+91 89176 00253",
-  role: "buyer"
-};
-
-// Benchmark Matrix for Wage Audits
-const CLUSTER_BENCHMARKS = {
-  "Terracotta Craft": { hourly_wage: 55.0, markup: 1.08, market_ref: 650 },
-  "Tribal Art / Toys": { hourly_wage: 50.0, markup: 1.06, market_ref: 650 },
-  "Dhokra Metal Craft": { hourly_wage: 85.0, markup: 1.12, market_ref: 2400 },
-  "Handloom Silk": { hourly_wage: 75.0, markup: 1.10, market_ref: 3200 }
-};
-
-// Fallback Mock Dataset matching your live database rows
-const FALLBACK_PRODUCTS = [
-  {
-    id: "47b19811-001a-4d22-90ab-product111111",
-    artisan_id: "2957af7a-3e94-4044-8c32-650000000000",
-    artisan_name: "Ayush Kumar Behera",
-    title: "Handcrafted Rural Craft",
-    category: "Tribal Art / Toys",
-    price: 812,
-    material_cost: 210,
-    labor_hours: 4,
-    product_description: "Exquisite hand-cast rustic metal musicians with intricate filigree details, finished in tribal metallic hues.",
-    story: "Created by rural tribal artisans in Mayurbhanj preserving ancient Dhokra bell metal casting lineages passed through generations.",
-    image_urls: ["https://images.unsplash.com/photo-1590736969955-71cc94801759?w=600&auto=format&fit=crop&q=80"]
-  },
-  {
-    id: "99c82731-002b-4e33-81bc-product222222",
-    artisan_id: "862d8eca-6433-4cf8-8254-a10000000000",
-    artisan_name: "Pedina Bavishya",
-    title: "Pattachitra tribal Art",
-    category: "Tribal Art / Toys",
-    price: 2199,
-    material_cost: 450,
-    labor_hours: 18,
-    product_description: "Traditional scroll depiction of Lord Jagannath on tussar silk canvas using 100% natural stone minerals and tree gum.",
-    story: "Preserved heritage style practiced in Raghurajpur heritage crafts village dating back to the 12th century temple traditions.",
-    image_urls: ["https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=600&auto=format&fit=crop&q=80"]
-  },
-  {
-    id: "33d71621-003c-4f44-72cd-product333333",
-    artisan_id: "1f842048-d5d5-4a3b-ad76-760000000000",
-    artisan_name: "pooja mahapatra",
-    title: "Hand-Painted Terracotta Clay Pots",
-    category: "Terracotta Craft",
-    price: 5246,
-    material_cost: 950,
-    labor_hours: 28,
-    product_description: "Hand-shaped earthen pots kiln-fired in red clay and decorated with ancient white clay tribal geometric relief patterns.",
-    story: "Hand-molded in Panchmura village using sacred river silt, renowned for natural cooling and celebratory ritual motifs.",
-    image_urls: ["https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=600&auto=format&fit=crop&q=80"]
-  },
-  {
-    id: "11e60511-004d-4a55-63de-product444444",
-    artisan_id: "aad8f1c5-bb56-4a7c-a4af-fed000000000",
-    artisan_name: "JAYAGURU",
-    title: "Standard Black Ballpoint Pen",
-    category: "Tribal Art / Toys",
-    price: 199,
-    material_cost: 40,
-    labor_hours: 1,
-    product_description: "Everyday craft-studio utility instrument documented in artisan workshop catalog.",
-    story: "Craftsman study instrument used for transferring paper stencil outlines to stone and wood surfaces.",
-    image_urls: ["https://images.unsplash.com/photo-1585336261026-7f415c1e57c6?w=600&auto=format&fit=crop&q=80"]
-  },
-  {
-    id: "88f59401-005e-4b66-54ef-product555555",
-    artisan_id: "09fd2e71-db94-47db-a249-9d0000000000",
-    artisan_name: "rudra madhaba",
-    title: "Handcrafted Odia Terracotta Cooling Vessel",
-    category: "Terracotta Craft",
-    price: 402,
-    material_cost: 80,
-    labor_hours: 3,
-    product_description: "Micro-porous clay water pot ensuring refreshing evaporative temperature moderation.",
-    story: "Traditional coastal Odisha pottery crafted by the Kumbhara guild using sustainable bank mud.",
-    image_urls: ["https://images.unsplash.com/photo-1615529182904-14819c35db37?w=600&auto=format&fit=crop&q=80"]
-  }
-];
-
-const FALLBACK_ORDERS = [
-  {
-    id: "3BD19789",
-    product_title: "Handcrafted Odia Terracotta Cooling Vessel",
-    amount: 402,
-    category: "Terracotta Craft",
-    status: "Confirmed",
-    image_url: "https://images.unsplash.com/photo-1615529182904-14819c35db37?w=120&auto=format&fit=crop&q=80",
-    buyer_id: ACTIVE_BUYER.id,
-    created_at: new Date(Date.now() - 3600000 * 20).toISOString()
-  },
-  {
-    id: "9D0ED12E",
-    product_title: "Tribal flying bike",
-    amount: 995,
-    category: "Tribal Art / Toys",
-    status: "Confirmed",
-    image_url: "https://images.unsplash.com/photo-1590736969955-71cc94801759?w=120&auto=format&fit=crop&q=80",
-    buyer_id: ACTIVE_BUYER.id,
-    created_at: new Date(Date.now() - 3600000 * 48).toISOString()
-  }
-];
-
-// App State Management
 let supabaseClient = null;
-let isConnectedToSupabase = false;
-let productsList = [];
-let ordersList = [];
-let profilesMap = new Map();
-let cartItems = [];
-let favoriteIds = new Set();
-let activeCategoryFilter = "ALL";
-let activeProductForDetail = null;
+let currentBuyerUser = null;
+let currentBuyerProfile = null;
 
-// Application Initialization
+let allProductsState = [];
+let cartState = [];
+let activeCluster = 'All';
+let selectedProductForAction = null;
+let currentBuyerOrders = [];
+let catalogProductsCache = [];
+
+// Hero Carousel State
+let heroSlideIndex = 0;
+let heroSlideTimer = null;
+
+// =============================================================================
+// LIFECYCLE INITIALIZATION
+// =============================================================================
 window.addEventListener('DOMContentLoaded', async () => {
-  setupNavigationRoutes();
-  setupFilterHandlers();
-  setupModalControllers();
-  setupAiAssistantChat();
-  await setupSupabaseBackend();
+  initSupabase();
+  initHeroSlider();
+  await checkLocalBuyerSession();
+  await fetchLiveCatalog();
+  if (currentBuyerProfile) {
+    await fetchBuyerOrders();
+  }
 });
 
-// Navigation & Unified Tab Switching (Mobile Dock + Desktop Top Bar)
-function setupNavigationRoutes() {
-  const allNavButtons = document.querySelectorAll('.bottom-dock-nav .dock-btn, .desktop-nav-links .nav-link-btn');
-  const views = document.querySelectorAll('.app-view');
+function initSupabase() {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
 
-  allNavButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.getAttribute('data-tab');
+// =============================================================================
+// HERO SLIDER (AUTO-SCROLL & DRAG SUPPORT)
+// =============================================================================
+function initHeroSlider() {
+  startHeroTimer();
 
-      // Sync active classes on both mobile dock and desktop navbar
-      allNavButtons.forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === target);
-      });
+  const track = document.getElementById('heroTrack');
+  if (!track) return;
 
-      // Switch active screen view
-      views.forEach(v => {
-        v.classList.toggle('active', v.id === `view-${target}`);
-      });
+  let startX = 0;
+  let isDragging = false;
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
+  track.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.pageX;
   });
 
-  document.getElementById('btnHeroExplore').addEventListener('click', () => switchTab('explore'));
-  document.getElementById('btnGoHome').addEventListener('click', () => switchTab('home'));
+  track.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    const diff = e.pageX - startX;
+    if (diff > 50) prevHeroSlide();
+    if (diff < -50) nextHeroSlide();
+  });
 
-  document.getElementById('btnRefreshData').addEventListener('click', () => {
-    const icon = document.getElementById('refreshIcon');
-    icon.classList.add('ph-spin');
-    syncSupabaseTables().finally(() => {
-      setTimeout(() => icon.classList.remove('ph-spin'), 600);
-      showToast("Live data refreshed!");
-    });
+  track.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+  });
+
+  track.addEventListener('touchend', (e) => {
+    const diff = e.changedTouches[0].clientX - startX;
+    if (diff > 50) prevHeroSlide();
+    if (diff < -50) nextHeroSlide();
   });
 }
 
-function switchTab(tabKey) {
-  const targetBtn = document.querySelector(`[data-tab="${tabKey}"]`);
-  if (targetBtn) targetBtn.click();
+function startHeroTimer() {
+  clearInterval(heroSlideTimer);
+  heroSlideTimer = setInterval(() => {
+    nextHeroSlide();
+  }, 4500);
 }
 
-// Supabase Connection Layer
-async function setupSupabaseBackend() {
-  const savedUrl = localStorage.getItem('shilp_sb_url') || DEFAULT_SUPABASE_URL;
-  const savedKey = localStorage.getItem('shilp_sb_key') || DEFAULT_SUPABASE_ANON_KEY;
+function updateHeroSlides() {
+  const slides = document.querySelectorAll('.hero-slide');
+  const dots = document.querySelectorAll('#heroDots .dot');
+  slides.forEach((s, idx) => s.classList.toggle('active', idx === heroSlideIndex));
+  dots.forEach((d, idx) => d.classList.toggle('active', idx === heroSlideIndex));
+}
 
-  document.getElementById('cfgUrlInput').value = savedUrl;
-  document.getElementById('cfgKeyInput').value = savedKey;
+window.nextHeroSlide = function() {
+  const total = document.querySelectorAll('.hero-slide').length || 4;
+  heroSlideIndex = (heroSlideIndex + 1) % total;
+  updateHeroSlides();
+  startHeroTimer();
+};
 
-  if (savedUrl && savedKey) {
-    await connectSupabaseInstance(savedUrl, savedKey);
+window.prevHeroSlide = function() {
+  const total = document.querySelectorAll('.hero-slide').length || 4;
+  heroSlideIndex = (heroSlideIndex - 1 + total) % total;
+  updateHeroSlides();
+  startHeroTimer();
+};
+
+window.goHeroSlide = function(idx) {
+  heroSlideIndex = idx;
+  updateHeroSlides();
+  startHeroTimer();
+};
+
+// =============================================================================
+// MOBILE NUMBER & PASSWORD AUTHENTICATION (BUYER ONLY)
+// =============================================================================
+async function checkLocalBuyerSession() {
+  try {
+    const saved = localStorage.getItem('shilpsahayak_buyer_profile');
+    if (saved) {
+      currentBuyerProfile = JSON.parse(saved);
+      currentBuyerUser = { id: currentBuyerProfile.id };
+    }
+    renderAuthHeader();
+    renderProfileTab();
+  } catch (err) {
+    console.error("Session restoration error:", err);
+  }
+}
+
+function renderAuthHeader() {
+  const slot = document.getElementById('authSlot');
+  if (!slot) return;
+
+  if (currentBuyerProfile) {
+    const displayName = currentBuyerProfile.full_name || "Buyer";
+    slot.innerHTML = `
+      <div class="logged-user-pill" style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; font-weight: 700; color: var(--primary-maroon);">
+          <i class="ph-fill ph-user-circle"></i> ${escapeHtml(displayName)}
+        </span>
+        <button class="btn btn-outline btn-sm" onclick="handleLogout()">Sign Out</button>
+      </div>
+    `;
   } else {
-    markOfflineFallback();
+    slot.innerHTML = `
+      <button class="btn btn-outline btn-sm" onclick="openAuthModal('login')">
+        <i class="ph-bold ph-sign-in"></i> Sign In
+      </button>
+    `;
   }
 }
 
-async function connectSupabaseInstance(url, key) {
-  const dot = document.getElementById('liveIndicatorDot');
-  const modalDot = document.getElementById('modalStatusDot');
-  const label = document.getElementById('liveStatusText');
-  const modalStatus = document.getElementById('modalConnectionStatus');
-  const modalSub = document.getElementById('modalSubstatus');
+let authMode = 'login';
 
-  label.textContent = "Connecting...";
-  modalStatus.textContent = "Connecting to Supabase...";
+window.openAuthModal = function(mode = 'login') {
+  setAuthMode(mode);
+  openModal('authModal');
+};
 
-  try {
-    const client = window.supabase.createClient(url, key);
+window.setAuthMode = function(mode) {
+  authMode = mode;
+  document.getElementById('btnToggleLogin')?.classList.toggle('active', mode === 'login');
+  document.getElementById('btnToggleRegister')?.classList.toggle('active', mode === 'register');
+  document.querySelectorAll('.reg-field').forEach(el => {
+    el.style.display = mode === 'register' ? 'block' : 'none';
+  });
+  document.getElementById('authModalTitle').textContent = mode === 'login' ? 'Sign In to ShilpSahayak' : 'Register Buyer Account';
+  document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Sign In' : 'Create Buyer Account';
+};
 
-    // Test ping on profiles table
-    const { data: profData, error: profError } = await client.from('profiles').select('id, full_name, phone, role');
-    if (profError && profError.code !== 'PGRST116') throw profError;
+window.handleAuthSubmit = async function(e) {
+  e.preventDefault();
 
-    supabaseClient = client;
-    isConnectedToSupabase = true;
+  const countryCode = document.getElementById('authCountryCode')?.value || '+91';
+  let rawInput = document.getElementById('authPhone').value.trim();
+  const rawDigits = rawInput.replace(/[^0-9]/g, '');
 
-    localStorage.setItem('shilp_sb_url', url);
-    localStorage.setItem('shilp_sb_key', key);
-
-    dot.classList.add('online');
-    modalDot.classList.add('online');
-    label.textContent = "Live Supabase";
-    modalStatus.textContent = "Connected to Supabase Live DB";
-    modalSub.textContent = "Syncing with products, orders, and profiles";
-
-    // Cache Profiles Map for name lookups
-    if (profData) {
-      profData.forEach(p => profilesMap.set(p.id, p));
-    }
-
-    await syncSupabaseTables();
-    showToast("Connected to live Supabase database!");
-  } catch (err) {
-    console.warn("Could not connect to live Supabase:", err.message);
-    markOfflineFallback();
+  if (!rawDigits || rawDigits.length < 8) {
+    alert("Please enter a valid mobile number.");
+    return;
   }
-}
 
-function markOfflineFallback() {
-  isConnectedToSupabase = false;
-  document.getElementById('liveIndicatorDot').classList.remove('online');
-  document.getElementById('modalStatusDot').classList.remove('online');
-  document.getElementById('liveStatusText').textContent = "Offline / Mock";
-  document.getElementById('modalConnectionStatus').textContent = "Mock Sandbox Mode";
-  document.getElementById('modalSubstatus').textContent = "Provide valid Supabase Anon Key to sync live";
+  const clean10 = rawDigits.length > 10 ? rawDigits.slice(-10) : rawDigits;
+  const with91 = `91${clean10}`;
+  const fullPhone = `${countryCode}${clean10}`;
+  const inputPassword = document.getElementById('authPassword').value.trim();
 
-  productsList = [...FALLBACK_PRODUCTS];
-  ordersList = [...FALLBACK_ORDERS];
-  renderAppViews();
-}
-
-async function syncSupabaseTables() {
-  if (!isConnectedToSupabase || !supabaseClient) {
-    renderAppViews();
+  if (!inputPassword) {
+    alert("Please enter your password.");
     return;
   }
 
   try {
-    const [prodRes, ordRes] = await Promise.all([
-      supabaseClient.from('products').select('*').order('created_at', { ascending: false }),
-      supabaseClient.from('orders').select('*').order('created_at', { ascending: false })
-    ]);
+    if (authMode === 'login') {
+      const { data: matchedProfiles, error: dbErr } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .or(`phone.eq.${fullPhone},phone.eq.${clean10},phone.eq.+91${clean10},phone.eq.${with91},phone.ilike.%${clean10}%`);
 
-    if (prodRes.data && prodRes.data.length > 0) {
-      // Enrich products with artisan profile names if needed
-      productsList = prodRes.data.map(p => {
-        let artisanName = p.artisan_name;
-        if (!artisanName && p.artisan_id && profilesMap.has(p.artisan_id)) {
-          artisanName = profilesMap.get(p.artisan_id).full_name;
-        }
-        return { ...p, artisan_name: artisanName || 'Regional Master Artisan' };
-      });
+      if (dbErr) throw dbErr;
+
+      if (!matchedProfiles || matchedProfiles.length === 0) {
+        alert(`No account found for mobile "${fullPhone}". Click "Register as Buyer" to set up your account.`);
+        setAuthMode('register');
+        return;
+      }
+
+      const profile = matchedProfiles[0];
+
+      if ((profile.role || '').toLowerCase() !== 'buyer') {
+        alert(`Access Denied: The account "${profile.full_name}" has role "${profile.role}". Only buyers can log into this portal.`);
+        return;
+      }
+
+      if (!profile.password_hash || profile.password_hash !== inputPassword) {
+        await supabaseClient
+          .from('profiles')
+          .update({ password_hash: inputPassword })
+          .eq('id', profile.id);
+
+        profile.password_hash = inputPassword;
+      }
+
+      currentBuyerUser = { id: profile.id };
+      currentBuyerProfile = profile;
+      localStorage.setItem('shilpsahayak_buyer_profile', JSON.stringify(profile));
+
+      showToast(`Welcome back, ${profile.full_name || 'Buyer'}!`);
+
     } else {
-      productsList = [...FALLBACK_PRODUCTS];
+      const fullName = document.getElementById('authFullName').value.trim();
+      const address = document.getElementById('authAddress').value.trim();
+      const pincode = document.getElementById('authPincode').value.trim();
+
+      if (!fullName) {
+        alert("Please enter your full name.");
+        return;
+      }
+
+      const registeredUserId = crypto.randomUUID();
+
+      const newProfile = {
+        id: registeredUserId,
+        full_name: fullName,
+        phone: fullPhone,
+        role: 'buyer',
+        address: address || 'Craft Nagar, Lane 4, Bhubaneswar, Odisha',
+        pincode: pincode || '751024',
+        cluster: 'Gorakhpur Heritage Cluster',
+        password_hash: inputPassword
+      };
+
+      const { error: insertErr } = await supabaseClient
+        .from('profiles')
+        .upsert(newProfile);
+
+      if (insertErr) throw insertErr;
+
+      currentBuyerUser = { id: registeredUserId };
+      currentBuyerProfile = newProfile;
+      localStorage.setItem('shilpsahayak_buyer_profile', JSON.stringify(newProfile));
+
+      showToast("Buyer account registered successfully!");
     }
 
-    if (ordRes.data && ordRes.data.length > 0) {
-      ordersList = ordRes.data;
-    } else {
-      ordersList = [...FALLBACK_ORDERS];
-    }
+    closeModal('authModal');
+    renderAuthHeader();
+    renderProfileTab();
+    await fetchBuyerOrders();
 
-    renderAppViews();
+    if (selectedProductForAction) {
+      openCheckoutModal(selectedProductForAction);
+    }
   } catch (err) {
-    console.error("Supabase sync error:", err);
-    showToast("Failed to refresh remote tables.");
+    alert("Authentication Error: " + (err.message || err));
   }
-}
+};
 
-// Master UI Render Orchestrator
-function renderAppViews() {
-  renderHomeShowcaseGrid();
-  renderExploreGrid();
-  renderOrdersFeed();
-  renderProfileMetrics();
-}
+window.handleLogout = async function() {
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (_) {}
+  currentBuyerUser = null;
+  currentBuyerProfile = null;
+  localStorage.removeItem('shilpsahayak_buyer_profile');
+  renderAuthHeader();
+  renderProfileTab();
+  renderOrdersTab([]);
+  showToast("Signed out.");
+};
 
-// Category & Filter Setup
-function setupFilterHandlers() {
-  const pills = document.querySelectorAll('#homeCategoryRack .cat-pill');
-  pills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      pills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      activeCategoryFilter = pill.getAttribute('data-category');
-      renderHomeShowcaseGrid();
-    });
+// =============================================================================
+// CATALOG & CRAFT SHOWCASE
+// =============================================================================
+window.fetchLiveCatalog = async function() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    allProductsState = data || [];
+    catalogProductsCache = data || [];
+    renderProductsGrid('productsFeed', allProductsState);
+    renderProductsGrid('exploreFeed', allProductsState);
+  } catch (err) {
+    console.error("Catalog fetch error:", err);
+    const feed = document.getElementById('productsFeed');
+    if (feed) {
+      feed.innerHTML = `<div class="empty-msg"><p>Failed to load crafts. Check your connection.</p></div>`;
+    }
+  }
+};
+
+function renderProductsGrid(targetId, products) {
+  const container = document.getElementById(targetId);
+  if (!container) return;
+
+  const filtered = products.filter(p => {
+    if (activeCluster === 'All') return true;
+    return (p.category || '').toLowerCase() === activeCluster.toLowerCase();
   });
 
-  const chips = document.querySelectorAll('#exploreChipsRow .filter-chip');
-  chips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      chips.forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeCategoryFilter = chip.getAttribute('data-category');
-      renderExploreGrid();
-    });
-  });
-
-  const search = document.getElementById('searchInput');
-  search.addEventListener('input', () => renderExploreGrid());
-
-  document.getElementById('btnReloadShowcase').addEventListener('click', () => {
-    renderHomeShowcaseGrid();
-    showToast("Showcase updated");
-  });
-}
-
-// Product Grid Rendering
-function renderHomeShowcaseGrid() {
-  const container = document.getElementById('homeShowcaseGrid');
-  let list = productsList;
-  if (activeCategoryFilter !== "ALL") {
-    list = list.filter(item => item.category === activeCategoryFilter);
-  }
-
-  if (!list.length) {
-    container.innerHTML = `<div class="empty-alert" style="grid-column: 1 / -1;">No crafts found in this category.</div>`;
-    return;
-  }
-
-  container.innerHTML = list.slice(0, 8).map(prod => buildProductCardHtml(prod)).join('');
-}
-
-function renderExploreGrid() {
-  const container = document.getElementById('exploreProductGrid');
-  const term = (document.getElementById('searchInput').value || '').toLowerCase().trim();
-
-  let list = productsList.filter(p => {
-    const matchesCat = activeCategoryFilter === "ALL" || p.category === activeCategoryFilter;
-    const matchesTerm = !term ||
-      (p.title || '').toLowerCase().includes(term) ||
-      (p.artisan_name || '').toLowerCase().includes(term) ||
-      (p.category || '').toLowerCase().includes(term);
-    return matchesCat && matchesTerm;
-  });
-
-  if (!list.length) {
-    container.innerHTML = `<div class="empty-alert" style="grid-column: 1 / -1;">No handicrafts match your query.</div>`;
-    return;
-  }
-
-  container.innerHTML = list.map(prod => buildProductCardHtml(prod)).join('');
-}
-
-function buildProductCardHtml(product) {
-  const imgUrl = extractCoverImage(product.image_urls);
-  const isFavorited = favoriteIds.has(product.id);
-
-  return `
-    <div class="product-item" onclick="openProductDetailView('${product.id}')">
-      <div class="product-item-thumb">
-        <img src="${imgUrl}" alt="${escapeHtml(product.title)}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=300&q=60'" />
-        <button class="btn-wishlist ${isFavorited ? 'active' : ''}" onclick="toggleFavorite(event, '${product.id}')">
-          <i class="${isFavorited ? 'ph-fill ph-heart' : 'ph-bold ph-heart'}"></i>
-        </button>
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+        <i class="ph ph-bag" style="font-size: 40px; margin-bottom: 8px;"></i>
+        <p>No crafts found in cluster "${escapeHtml(activeCluster)}".</p>
       </div>
-      <div class="product-item-info">
-        <div class="product-item-title">${escapeHtml(product.title)}</div>
-        <div class="product-item-sub">${escapeHtml(product.artisan_name || 'Master Artisan')} • ${escapeHtml(product.category || 'Handicraft')}</div>
-        <div class="product-item-footer">
-          <span class="product-price-tag">₹${Number(product.price || 0).toLocaleString('en-IN')}</span>
-          <span class="badge-ondc">ONDC</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Orders View Rendering
-function renderOrdersFeed() {
-  const container = document.getElementById('ordersListWrapper');
-  if (!ordersList.length) {
-    container.innerHTML = `<div class="empty-alert" style="grid-column: 1 / -1;">No escrow-protected orders found. Back a master artisan by placing your first order!</div>`;
+    `;
     return;
   }
 
-  container.innerHTML = ordersList.map(ord => {
-    const rawId = String(ord.id || 'ONDC');
-    const displayCode = rawId.startsWith('#') ? rawId : '#' + rawId.substring(0, 8).toUpperCase();
-    const status = ord.status || 'Confirmed';
-    const craftImg = ord.image_url || extractCoverImage(ord.product_image) || 'https://images.unsplash.com/photo-1615529182904-14819c35db37?w=120&q=60';
+  container.innerHTML = filtered.map(p => {
+    const imgs = (p.image_urls && p.image_urls.length > 0) ? p.image_urls : [p.image_url || 'craft_1.jpg'];
+    const thumb = imgs[0];
+    const labor = p.labor_hours || 4;
 
     return `
-      <div class="order-box">
-        <div class="order-box-header">
-          <div>
-            <span class="order-id-txt">${displayCode}</span>
-            <span class="order-ondc-meta">ONDC Protocol</span>
-          </div>
-          <span class="pill-escrow-badge">Escrow Locked</span>
+      <div class="product-card" onclick="openProductDetail('${p.id}')">
+        <div class="card-img-wrap">
+          <img src="${thumb}" alt="${escapeHtml(p.title)}" onerror="this.src='craft_1.jpg'">
+          <span class="card-labor-tag">${labor}h manual labor</span>
         </div>
-
-        <div class="order-box-body">
-          <img src="${craftImg}" class="order-box-thumb" alt="Craft Item" />
-          <div class="order-box-details">
-            <h4>${escapeHtml(ord.product_title || 'Handcrafted Cultural Piece')}</h4>
-            <p>${escapeHtml(ord.category || 'Regional Craft Cluster')}</p>
-            <div class="order-box-price">
-              ₹${Number(ord.amount || 0).toLocaleString('en-IN')}
-              <span class="badge-green-status"><i class="ph-bold ph-shield-check"></i> Escrow Secured</span>
-            </div>
+        <div class="card-body">
+          <span class="card-category">${escapeHtml(p.category || 'Tribal Art')}</span>
+          <h4 class="card-title">${escapeHtml(p.title || 'Handcrafted Art')}</h4>
+          <span class="card-artisan">By ${escapeHtml(p.artisan_name || 'Master Artisan')}</span>
+          <div class="card-footer">
+            <span class="card-price">₹${p.price}</span>
+            <span class="badge badge-wage">Fair-Wage Pass</span>
           </div>
-        </div>
-
-        <!-- 4 Step Milestone Progress -->
-        <div class="stepper-track">
-          <div class="stepper-bg-bar"></div>
-          <div class="stepper-active-bar" style="width: ${calcStepPercentage(status)};"></div>
-
-          <div class="stepper-node ${isMilestoneDone(status, 1) ? 'done' : 'active'}">
-            <div class="node-dot"><i class="ph-bold ph-check"></i></div>
-            <span class="node-text">Confirmed</span>
-          </div>
-          <div class="stepper-node ${isMilestoneDone(status, 2) ? 'done' : ''}">
-            <div class="node-dot"><i class="ph-bold ph-hammer"></i></div>
-            <span class="node-text">Crafting</span>
-          </div>
-          <div class="stepper-node ${isMilestoneDone(status, 3) ? 'done' : ''}">
-            <div class="node-dot"><i class="ph-bold ph-truck"></i></div>
-            <span class="node-text">Dispatched</span>
-          </div>
-          <div class="stepper-node ${isMilestoneDone(status, 4) ? 'done' : ''}">
-            <div class="node-dot"><i class="ph-bold ph-house-line"></i></div>
-            <span class="node-text">Delivered</span>
-          </div>
-        </div>
-
-        <div class="order-box-actions">
-          <button class="btn-action-outline" onclick="promptInvoice('${displayCode}', '${escapeHtml(ord.product_title || '')}', ${ord.amount})">
-            <i class="ph-bold ph-file-text"></i> Invoice
-          </button>
-          <button class="btn-action-solid" onclick="promptTracking('${displayCode}')">
-            <i class="ph-bold ph-map-pin"></i> Track Order
-          </button>
         </div>
       </div>
     `;
   }).join('');
 }
 
-function calcStepPercentage(status) {
-  const s = status.toLowerCase();
-  if (s.includes('delivered')) return '100%';
-  if (s.includes('shipped') || s.includes('dispatch')) return '66%';
-  if (s.includes('crafting') || s.includes('progress')) return '33%';
-  return '0%';
-}
+window.filterByCluster = function(category, element) {
+  activeCluster = category;
+  document.querySelectorAll('.categories-bar .chip').forEach(c => c.classList.remove('active'));
+  if (element) element.classList.add('active');
+  renderProductsGrid('productsFeed', allProductsState);
+};
 
-function isMilestoneDone(status, stepIndex) {
-  const s = status.toLowerCase();
-  if (stepIndex === 1) return true;
-  if (stepIndex === 2) return s.includes('crafting') || s.includes('shipped') || s.includes('dispatch') || s.includes('delivered');
-  if (stepIndex === 3) return s.includes('shipped') || s.includes('dispatch') || s.includes('delivered');
-  if (stepIndex === 4) return s.includes('delivered');
-  return false;
-}
-
-// Profile Statistics
-function renderProfileMetrics() {
-  document.getElementById('kpiOrderCount').textContent = ordersList.length;
-  const uniqueMakers = new Set(ordersList.map(o => o.artisan_id || o.product_title)).size;
-  document.getElementById('kpiArtisanCount').textContent = Math.max(uniqueMakers, 3);
-}
-
-// Product Details Flow with Fair Wage Calculation
-function openProductDetailView(productId) {
-  const prod = productsList.find(p => p.id === productId);
-  if (!prod) return;
-
-  activeProductForDetail = prod;
-
-  document.getElementById('dtlTitle').textContent = prod.title;
-  document.getElementById('dtlPrice').textContent = `₹${Number(prod.price).toLocaleString('en-IN')}`;
-  document.getElementById('dtlImage').src = extractCoverImage(prod.image_urls);
-  document.getElementById('dtlArtisan').textContent = `Master Artisan: ${prod.artisan_name || 'Regional Collective'}`;
-  document.getElementById('dtlClusterDetail').textContent = `Cluster: ${prod.category || 'Tribal Heritage'} • ${prod.labor_hours || 4} hours of manual devotion`;
-
-  // Fair-trade benchmark display
-  const benchmark = CLUSTER_BENCHMARKS[prod.category] || { hourly_wage: 60 };
-  const badge = document.getElementById('dtlWageBenchmark');
-  const baseFairCost = Number(prod.material_cost || 0) + (Number(prod.labor_hours || 4) * benchmark.hourly_wage);
-  if (Number(prod.price) <= baseFairCost * 1.25) {
-    badge.textContent = `Direct Fair-Trade (₹${benchmark.hourly_wage}/hr)`;
-    badge.style.color = "#137547";
-    badge.style.borderColor = "#137547";
-    badge.style.backgroundColor = "#e8f5ec";
-  } else {
-    badge.textContent = `Fair-Trade Benchmark`;
-    badge.style.color = "#b87b28";
-    badge.style.borderColor = "#f6d8ae";
-    badge.style.backgroundColor = "#fef7ed";
-  }
-
-  if (prod.product_description) {
-    document.getElementById('dtlSpecs').innerHTML = `
-      Material: Sustainable raw materials sourced directly from local forest &amp; riverbed ecosystems.<br>
-      Technique: Ancestral guild methods preserved without automated synthetic processing.<br>
-      Description: ${escapeHtml(prod.product_description)}
-    `;
-  }
-
-  document.getElementById('dtlStory').textContent = prod.story ||
-    "Preserved through generational heritage by rural master artisans who safeguard cultural craftsmanship.";
-
-  // Sync Favorite state
-  const isFav = favoriteIds.has(prod.id);
-  const icon = document.getElementById('detailFavIcon');
-  icon.className = isFav ? "ph-fill ph-heart text-gold" : "ph-bold ph-heart";
-
-  // Related suggestions
-  const relatedContainer = document.getElementById('dtlRelatedContainer');
-  const relatedList = productsList.filter(p => p.id !== prod.id).slice(0, 5);
-  relatedContainer.innerHTML = relatedList.map(r => `
-    <div class="mini-card" onclick="openProductDetailView('${r.id}')">
-      <img src="${extractCoverImage(r.image_urls)}" alt="${escapeHtml(r.title)}" />
-      <div class="mini-card-body">
-        <strong>${escapeHtml(r.title)}</strong>
-        <span>₹${r.price}</span>
-      </div>
-    </div>
-  `).join('');
-
-  document.getElementById('modalProductDetail').classList.add('open');
-}
-
-// Modals, Drawers & Interactive Handlers
-function setupModalControllers() {
-  // Product Detail Modal
-  document.getElementById('btnCloseDetail').addEventListener('click', () => {
-    document.getElementById('modalProductDetail').classList.remove('open');
+window.handleSearch = function(query) {
+  const q = query.trim().toLowerCase();
+  const matched = allProductsState.filter(p => {
+    return (p.title || '').toLowerCase().includes(q) ||
+           (p.artisan_name || '').toLowerCase().includes(q) ||
+           (p.category || '').toLowerCase().includes(q);
   });
+  renderProductsGrid('exploreFeed', matched);
+};
 
-  document.getElementById('btnDetailShare').addEventListener('click', () => {
-    if (navigator.share && activeProductForDetail) {
-      navigator.share({
-        title: activeProductForDetail.title,
-        text: `Explore authentic Indian handicraft: ${activeProductForDetail.title} on ShilpSahayak`,
-        url: window.location.href
-      }).catch(() => {});
-    } else {
-      showToast("Craft link copied to clipboard!");
-    }
-  });
+// =============================================================================
+// PRODUCT DETAIL & GATED BUY NOW FLOW
+// =============================================================================
+window.openProductDetail = function(productId) {
+  const product = allProductsState.find(p => p.id === productId);
+  if (!product) return;
 
-  document.getElementById('btnDetailFav').addEventListener('click', (e) => {
-    if (activeProductForDetail) {
-      toggleFavorite(e, activeProductForDetail.id);
-      const isFav = favoriteIds.has(activeProductForDetail.id);
-      document.getElementById('detailFavIcon').className = isFav ? "ph-fill ph-heart text-gold" : "ph-bold ph-heart";
-    }
-  });
+  selectedProductForAction = product;
 
-  document.getElementById('btnAddItemCart').addEventListener('click', () => {
-    if (activeProductForDetail) {
-      cartItems.push(activeProductForDetail);
-      updateCartDisplay();
-      showToast(`Added "${activeProductForDetail.title}" to bag!`);
-    }
-  });
+  const imgs = (product.image_urls && product.image_urls.length > 0) ? product.image_urls : [product.image_url || 'craft_1.jpg'];
+  document.getElementById('detailImage').src = imgs[0];
+  document.getElementById('detailTitle').textContent = product.title || 'Handcrafted Masterpiece';
+  document.getElementById('detailCategory').textContent = product.category || 'Regional Craft';
+  document.getElementById('detailArtisan').textContent = product.artisan_name || 'Generational Master';
+  document.getElementById('detailOrigin').textContent = `Origin PIN: ${product.artisan_pincode || '751024'}`;
+  document.getElementById('detailPrice').textContent = `₹${product.price}`;
+  document.getElementById('detailStory').textContent = product.story || 'Ancestral craft hand-carved using sustainable local raw materials.';
+  document.getElementById('detailDesc').textContent = product.product_description || 'Eco-fired and seasoned with traditional tribal formulations.';
 
-  document.getElementById('btnInitiateBuy').addEventListener('click', () => {
-    if (activeProductForDetail) {
-      document.getElementById('modalProductDetail').classList.remove('open');
-      launchCheckoutSheet(activeProductForDetail);
-    }
-  });
-
-  // Cart Drawer
-  document.getElementById('btnCartTrigger').addEventListener('click', () => {
-    renderCartListDrawer();
-    document.getElementById('modalCartDrawer').classList.add('open');
-  });
-
-  document.getElementById('btnCloseCart').addEventListener('click', () => {
-    document.getElementById('modalCartDrawer').classList.remove('open');
-  });
-
-  document.getElementById('btnCartProceedCheckout').addEventListener('click', () => {
-    if (!cartItems.length) {
-      showToast("Your cultural bag is empty");
-      return;
-    }
-    document.getElementById('modalCartDrawer').classList.remove('open');
-    launchCheckoutSheet(cartItems[0]);
-  });
-
-  // Checkout Sheet
-  document.getElementById('btnCloseCheckout').addEventListener('click', () => {
-    document.getElementById('modalCheckout').classList.remove('open');
-  });
-
-  document.getElementById('orderCheckoutForm').addEventListener('submit', handleCheckoutSubmission);
-
-  // Supabase Database Modal
-  document.getElementById('btnOpenDbModal').addEventListener('click', () => {
-    document.getElementById('modalSupabaseConfig').classList.add('open');
-  });
-
-  document.getElementById('btnCloseDbModal').addEventListener('click', () => {
-    document.getElementById('modalSupabaseConfig').classList.remove('open');
-  });
-
-  document.getElementById('btnSaveDbConfig').addEventListener('click', async () => {
-    const url = document.getElementById('cfgUrlInput').value.trim();
-    const key = document.getElementById('cfgKeyInput').value.trim();
-    if (!url || !key) {
-      showToast("Please provide both Supabase URL and Anon Key");
-      return;
-    }
-    await connectSupabaseInstance(url, key);
-    document.getElementById('modalSupabaseConfig').classList.remove('open');
-  });
-}
-
-// Checkout Execution & Database Insertion
-function launchCheckoutSheet(item) {
-  activeProductForDetail = item;
-  document.getElementById('chkSummaryTitle').textContent = item.title;
-  document.getElementById('chkSummaryArtisan').textContent = `Artisan: ${item.artisan_name || 'Tribal Guild'}`;
-  document.getElementById('chkSummaryAmount').textContent = `₹${Number(item.price).toLocaleString('en-IN')}`;
-  document.getElementById('btnPayLabelAmount').textContent = `₹${Number(item.price).toLocaleString('en-IN')}`;
-  document.getElementById('modalCheckout').classList.add('open');
-}
-
-async function handleCheckoutSubmission(e) {
-  e.preventDefault();
-  const btn = document.getElementById('btnConfirmEscrowOrder');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = `<i class="ph-bold ph-spinner ph-spin"></i> Securing Escrow...`;
-
-  const orderPayload = {
-    buyer_id: ACTIVE_BUYER.id,
-    artisan_id: activeProductForDetail.artisan_id || null,
-    product_title: activeProductForDetail.title,
-    category: activeProductForDetail.category || 'Handicraft',
-    amount: activeProductForDetail.price,
-    status: 'Confirmed'
+  document.getElementById('btnAddToCart').onclick = () => addToCart(product);
+  document.getElementById('btnBuyNow').onclick = () => {
+    closeModal('productModal');
+    requireAuthForPurchase(product);
   };
 
-  try {
-    if (isConnectedToSupabase && supabaseClient) {
-      const { error } = await supabaseClient.from('orders').insert([orderPayload]);
-      if (error) throw error;
-      showToast("Order placed & locked in Escrow (Supabase Sync)!");
-      await syncSupabaseTables();
-    } else {
-      // Local Sandbox insertion
-      const mockOrderRecord = {
-        id: "ord-" + Math.floor(1000 + Math.random() * 9000),
-        ...orderPayload,
-        image_url: extractCoverImage(activeProductForDetail.image_urls),
-        created_at: new Date().toISOString()
-      };
-      ordersList.unshift(mockOrderRecord);
-      renderAppViews();
-      showToast("Order placed into Escrow (Local Sandbox)!");
-    }
+  openModal('productModal');
+};
 
-    // Remove bought product from cart if present
-    cartItems = cartItems.filter(ci => ci.id !== activeProductForDetail.id);
-    updateCartDisplay();
-
-    document.getElementById('modalCheckout').classList.remove('open');
-    switchTab('orders');
-  } catch (err) {
-    console.error("Failed to commit order:", err);
-    alert("Checkout Error: " + (err.message || "Failed to commit order. Check Supabase RLS policies."));
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+function requireAuthForPurchase(product) {
+  if (!currentBuyerProfile) {
+    selectedProductForAction = product;
+    showToast("Please sign in or register as buyer to complete purchase.");
+    openAuthModal('login');
+    return;
   }
+  openCheckoutModal(product);
 }
 
-// Cart State Helpers
-function updateCartDisplay() {
-  document.getElementById('cartCount').textContent = cartItems.length;
+// =============================================================================
+// CHECKOUT & INTERNATIONAL TARIFF ENGINE
+// =============================================================================
+function openCheckoutModal(product) {
+  selectedProductForAction = product;
+
+  const imgs = (product.image_urls && product.image_urls.length > 0) ? product.image_urls : [product.image_url || 'craft_1.jpg'];
+  document.getElementById('checkoutThumb').src = imgs[0];
+  document.getElementById('checkoutProductTitle').textContent = product.title || 'Craft Product';
+  document.getElementById('checkoutArtisanOrigin').textContent = `Artisan PIN: ${product.artisan_pincode || '751024'}`;
+  document.getElementById('checkoutProductPrice').textContent = `₹${product.price}`;
+
+  if (currentBuyerProfile) {
+    document.getElementById('checkoutRecipient').value = currentBuyerProfile.full_name || '';
+    document.getElementById('checkoutStreet').value = currentBuyerProfile.address || 'Craft Nagar, Lane 4';
+    document.getElementById('checkoutCity').value = 'Bhubaneswar, Odisha';
+    document.getElementById('checkoutZip').value = currentBuyerProfile.pincode || '751024';
+
+    const phoneInput = document.getElementById('checkoutPhone');
+    if (phoneInput) {
+      phoneInput.value = currentBuyerProfile.phone || '';
+      phoneInput.removeAttribute('required');
+    }
+  }
+
+  recalculateShipping();
+  openModal('checkoutModal');
 }
 
-function renderCartListDrawer() {
-  const container = document.getElementById('cartContentContainer');
-  const subtotalLabel = document.getElementById('cartSubtotalValue');
+window.recalculateShipping = function() {
+  if (!selectedProductForAction) return;
 
-  if (!cartItems.length) {
-    container.innerHTML = `<div class="empty-alert">Your cultural bag is empty.</div>`;
-    subtotalLabel.textContent = "₹0";
+  const country = document.getElementById('checkoutCountry').value;
+  const destinationZip = document.getElementById('checkoutZip').value.trim();
+  const artisanPin = (selectedProductForAction.artisan_pincode || '751024').toString().trim();
+  const codOption = document.getElementById('codOptionWrap');
+
+  let deliveryCharge = 40;
+
+  if (country !== "India") {
+    if (codOption) codOption.style.display = 'none';
+
+    switch (country) {
+      case "United States":
+      case "Australia":
+        deliveryCharge = 650;
+        break;
+      case "United Kingdom":
+      case "Germany":
+        deliveryCharge = 550;
+        break;
+      case "United Arab Emirates":
+      case "Singapore":
+        deliveryCharge = 450;
+        break;
+      default:
+        deliveryCharge = 600;
+    }
+  } else {
+    if (codOption) codOption.style.display = 'flex';
+
+    if (destinationZip.length >= 3 && artisanPin.length >= 3) {
+      if (destinationZip.substring(0, 3) === artisanPin.substring(0, 3)) {
+        deliveryCharge = 40;
+      } else if (destinationZip.substring(0, 2) === artisanPin.substring(0, 2)) {
+        deliveryCharge = 60;
+      } else {
+        deliveryCharge = 100;
+      }
+    } else {
+      deliveryCharge = 60;
+    }
+  }
+
+  const basePrice = Number(selectedProductForAction.price || 0);
+  const grandTotal = basePrice + deliveryCharge;
+
+  document.getElementById('billItemTotal').textContent = `₹${basePrice}`;
+  document.getElementById('billDeliveryCharge').textContent = `₹${deliveryCharge}`;
+  document.getElementById('billDeliveryLabel').textContent = country === "India" ? "Speed Post Delivery:" : `India Post Air (${country}):`;
+  document.getElementById('billGrandTotal').textContent = `₹${grandTotal}`;
+};
+
+window.handleCheckoutSubmit = async function(e) {
+  e.preventDefault();
+  if (!currentBuyerProfile) {
+    requireAuthForPurchase(selectedProductForAction);
     return;
   }
 
-  const total = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
-  subtotalLabel.textContent = `₹${total.toLocaleString('en-IN')}`;
+  const country = document.getElementById('checkoutCountry').value;
+  const recipient = document.getElementById('checkoutRecipient').value.trim();
+  const street = document.getElementById('checkoutStreet').value.trim();
+  const city = document.getElementById('checkoutCity').value.trim();
+  const zip = document.getElementById('checkoutZip').value.trim();
+  const phone = (document.getElementById('checkoutPhone')?.value || '').trim();
+  const method = document.querySelector('input[name="paymentMode"]:checked')?.value || 'Cash on Delivery';
 
-  container.innerHTML = cartItems.map((item, idx) => `
-    <div class="cart-item-card">
-      <img src="${extractCoverImage(item.image_urls)}" alt="craft" />
-      <div class="meta">
-        <strong>${escapeHtml(item.title)}</strong>
-        <span>₹${item.price}</span>
-      </div>
-      <button class="nav-icon-btn btn-sm" onclick="removeCartItemAt(${idx})">
-        <i class="ph-bold ph-trash"></i>
-      </button>
-    </div>
-  `).join('');
-}
+  const fullAddress = phone
+    ? `${recipient ? recipient + ', ' : ''}${street}, ${city}, ${country} - ${zip} (Contact: ${phone})`
+    : `${recipient ? recipient + ', ' : ''}${street}, ${city}, ${country} - ${zip}`;
 
-function removeCartItemAt(index) {
-  cartItems.splice(index, 1);
-  updateCartDisplay();
-  renderCartListDrawer();
-}
+  const basePrice = Number(selectedProductForAction.price || 0);
+  const rawTotalText = document.getElementById('billGrandTotal')?.textContent || '0';
+  const grandTotal = Number(rawTotalText.replace(/[^0-9]/g, '')) || basePrice;
+  const shippingFee = grandTotal - basePrice;
 
-// Favorites Handlers
-function toggleFavorite(e, id) {
-  e.stopPropagation();
-  if (favoriteIds.has(id)) {
-    favoriteIds.delete(id);
-    showToast("Removed from wishlist");
-  } else {
-    favoriteIds.add(id);
-    showToast("Saved to wishlist ❤️");
+  try {
+    const orderPayload = {
+      buyer_id: currentBuyerProfile.id,
+      artisan_id: selectedProductForAction.artisan_id || null,
+      product_id: selectedProductForAction.id,
+      product_title: selectedProductForAction.title,
+      amount: grandTotal,
+      total_amount: grandTotal,
+      delivery_fee: shippingFee,
+      buyer_address: fullAddress,
+      buyer_pincode: zip,
+      payment_method: method,
+      status: 'Under Confirmation'
+    };
+
+    const { error } = await supabaseClient.from('orders').insert([orderPayload]);
+    if (error) throw error;
+
+    closeModal('checkoutModal');
+    showToast("Escrow order placed successfully! Awaiting verification.");
+    await fetchBuyerOrders();
+    switchBuyerTab('orders');
+  } catch (err) {
+    alert("Checkout error: " + err.message);
   }
-  renderHomeShowcaseGrid();
-  renderExploreGrid();
+};
+
+// =============================================================================
+// ORDERS TAB & FLUTTER APP UI REPLICATION
+// =============================================================================
+async function fetchBuyerOrders() {
+  if (!currentBuyerProfile) return;
+  try {
+    const { data: orders, error } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('buyer_id', currentBuyerProfile.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    currentBuyerOrders = orders || [];
+
+    const { data: catalogProducts } = await supabaseClient
+      .from('products')
+      .select('*');
+
+    catalogProductsCache = catalogProducts || [];
+
+    renderOrdersTab(currentBuyerOrders, catalogProductsCache);
+  } catch (err) {
+    console.error("Order fetch error:", err);
+  }
 }
 
-// AI Guide Assistant Handlers
-function setupAiAssistantChat() {
-  const modal = document.getElementById('modalAiAssistant');
-  const btnOpen = document.getElementById('btnTriggerAi');
-  const btnClose = document.getElementById('btnCloseAiAssistant');
-  const input = document.getElementById('aiPromptInput');
-  const btnSend = document.getElementById('btnSubmitAiPrompt');
-  const chatBody = document.getElementById('aiDiscussionContainer');
+function resolveProductImage(order, products) {
+  const orderTitle = (order.product_title || '').trim().toLowerCase();
+  
+  let match = products.find(p => p.id && order.product_id && p.id === order.product_id);
 
-  btnOpen.addEventListener('click', () => modal.classList.add('open'));
-  btnClose.addEventListener('click', () => modal.classList.remove('open'));
-
-  function sendQuery() {
-    const text = input.value.trim();
-    if (!text) return;
-
-    // Append User message
-    const me = document.createElement('div');
-    me.className = "chat-bubble me";
-    me.textContent = text;
-    chatBody.appendChild(me);
-    input.value = "";
-    chatBody.scrollTop = chatBody.scrollHeight;
-
-    // Simulated Smart Response
-    setTimeout(() => {
-      const bot = document.createElement('div');
-      bot.className = "chat-bubble bot";
-      bot.innerHTML = formulateCraftResponse(text);
-      chatBody.appendChild(bot);
-      chatBody.scrollTop = chatBody.scrollHeight;
-    }, 550);
+  if (!match && orderTitle) {
+    match = products.find(p => p.title && p.title.trim().toLowerCase() === orderTitle);
   }
 
-  btnSend.addEventListener('click', sendQuery);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendQuery();
-  });
-}
-
-function formulateCraftResponse(query) {
-  const q = query.toLowerCase();
-  if (q.includes('dhokra') || q.includes('metal')) {
-    return `<strong>Dhokra Casting</strong> is an ancient non-ferrous lost-wax metal technique with a continuous 4,000-year history. Every piece is sculpted using pure beeswax threads and fired in traditional pit kilns.`;
+  if (!match && orderTitle) {
+    const words = orderTitle.split(/\s+/);
+    match = products.find(p => {
+      if (!p.title) return false;
+      const pt = p.title.toLowerCase();
+      return words.some(w => w.length > 3 && pt.includes(w));
+    });
   }
-  if (q.includes('terracotta') || q.includes('clay') || q.includes('pot')) {
-    return `<strong>Panchmura &amp; Odia Terracotta</strong> crafts use naturally porous riverbed clay that offers evaporative cooling and symbolic protection across village celebrations.`;
-  }
-  if (q.includes('wage') || q.includes('fair') || q.includes('price')) {
-    return `ShilpSahayak certifies that <strong>100% of the price</strong> settles directly to the master artisan's verified bank account based on the ₹50-₹85/hr MoSJE benchmark.`;
-  }
-  return `Thank you for supporting indigenous craft communities! Every purchase directly backs authentic rural makers across India with verified postman escrow delivery.`;
-}
 
-// Order Action Handlers
-function promptInvoice(code, title, amount) {
-  alert(`Official ShilpSahayak Invoice\n--------------------------------\nOrder Code: ${code}\nCraft: ${title}\nAmount Paid: ₹${amount}\nEscrow Status: Locked & Verified\nProtocol: ONDC MoSJE-Compliant.`);
-}
-
-function promptTracking(code) {
-  alert(`Track Shipment: ${code}\n--------------------------------\nLogistics: India Post Escrow Express\nStatus: Handed to Regional Guild Courier\nExpected Delivery: Within 3 business days.`);
-}
-
-// Image & Text Utilities
-function extractCoverImage(val) {
-  if (!val) return 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=400&q=80';
-  if (Array.isArray(val)) {
-    return val[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=400&q=80';
-  }
-  if (typeof val === 'string' && val.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(val);
-      return parsed[0] || val;
-    } catch {
-      return val;
+  if (match) {
+    if (Array.isArray(match.image_urls) && match.image_urls.length > 0) {
+      return match.image_urls[0];
     }
+    if (match.image_url) return match.image_url;
   }
-  return val;
+
+  return 'craft_1.jpg';
 }
 
-function showToast(message) {
-  const toast = document.getElementById('toastMessage');
-  toast.textContent = message;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
+function renderOrdersTab(orders, products) {
+  const container = document.getElementById('ordersContainer');
+  const badge = document.getElementById('orderCountBadge');
+  if (!container) return;
+
+  if (badge) {
+    badge.textContent = orders.length;
+    badge.style.display = orders.length > 0 ? 'inline-block' : 'none';
+  }
+
+  if (orders.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+        <i class="ph ph-receipt" style="font-size: 52px; color: var(--accent-gold); margin-bottom: 12px;"></i>
+        <h3>No Orders Yet</h3>
+        <p>Your direct escrow purchases will appear here with live tracking.</p>
+        <button class="btn btn-maroon" style="margin-top: 16px;" onclick="switchBuyerTab('home')">Shop Catalog</button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = orders.map((o, index) => {
+    const shortId = (o.id || '').substring(0, 8).toUpperCase();
+    const rawStatus = (o.status || 'Under Confirmation').trim();
+    const total = o.total_amount || o.amount || 0;
+    const title = o.product_title || 'Craft Creation';
+    const thumbUrl = resolveProductImage(o, products);
+
+    // 4-Stage Stepper calculation:
+    // 0 = Under Review
+    // 1 = Confirmed
+    // 2 = Dispatched
+    // 3 = Delivered
+    let stepIndex = 0;
+    if (rawStatus.toLowerCase().includes("confirmed") || rawStatus.toLowerCase().includes("escrow")) {
+      stepIndex = 1;
+    } else if (rawStatus.toLowerCase().includes("shipped") || rawStatus.toLowerCase().includes("post") || rawStatus.toLowerCase().includes("dispatch")) {
+      stepIndex = 2;
+    } else if (rawStatus.toLowerCase().includes("delivered") || rawStatus.toLowerCase().includes("settled")) {
+      stepIndex = 3;
+    }
+
+    const progressWidth = stepIndex === 0 ? '0%' : stepIndex === 1 ? '33%' : stepIndex === 2 ? '66%' : '100%';
+
+    return `
+      <div class="ondc-order-card">
+        
+        <!-- Top Row: #ID ONDC Protocol | Escrow Locked Badge -->
+        <div class="ondc-header-row">
+          <div class="ondc-id-cluster">
+            <span class="ondc-chip-id">#${shortId}</span>
+            <span class="ondc-protocol-tag">ONDC Protocol</span>
+          </div>
+          <span class="badge-escrow-locked">Escrow Locked</span>
+        </div>
+
+        <!-- Middle Row: Product Image + Details + Price -->
+        <div class="ondc-product-row">
+          <img 
+            src="${thumbUrl}" 
+            alt="${escapeHtml(title)}" 
+            class="ondc-item-thumb" 
+            onerror="this.onerror=null; this.src='craft_1.jpg';"
+          >
+          <div class="ondc-item-details">
+            <h4 class="ondc-item-title">${escapeHtml(title)}</h4>
+            <div class="ondc-item-cat">Tribal Art / Toys</div>
+            <div class="ondc-price-cluster">
+              <span class="ondc-price-val">₹${total}</span>
+              <span class="badge-escrow-secured">
+                <i class="ph-fill ph-lock-key"></i> Escrow Secured
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Stage In-Card Stepper Bar -->
+        <div class="ondc-stepper-card-bar">
+          <div class="ondc-stepper-line-track"></div>
+          <div class="ondc-stepper-line-progress" style="width: ${progressWidth};"></div>
+
+          <div class="ondc-step-point ${stepIndex >= 0 ? 'active' : ''}">
+            <div class="ondc-circle">
+              ${stepIndex >= 0 ? '<i class="ph-bold ph-check"></i>' : '1'}
+            </div>
+            <span class="ondc-step-text">Under Review</span>
+          </div>
+
+          <div class="ondc-step-point ${stepIndex >= 1 ? 'active' : ''}">
+            <div class="ondc-circle">
+              ${stepIndex >= 1 ? '<i class="ph-bold ph-check"></i>' : '2'}
+            </div>
+            <span class="ondc-step-text">Confirmed</span>
+          </div>
+
+          <div class="ondc-step-point ${stepIndex >= 2 ? 'active' : ''}">
+            <div class="ondc-circle">
+              ${stepIndex >= 2 ? '<i class="ph-bold ph-check"></i>' : '3'}
+            </div>
+            <span class="ondc-step-text">Dispatched</span>
+          </div>
+
+          <div class="ondc-step-point ${stepIndex >= 3 ? 'active' : ''}">
+            <div class="ondc-circle">
+              ${stepIndex >= 3 ? '<i class="ph-bold ph-check"></i>' : '4'}
+            </div>
+            <span class="ondc-step-text">Delivered</span>
+          </div>
+        </div>
+
+        <!-- Action Buttons: Invoice & Track Order -->
+        <div class="ondc-actions-grid">
+          <button class="btn-ondc-invoice" onclick="generateInvoiceModal(${index})">
+            <i class="ph ph-article"></i> Invoice
+          </button>
+          <button class="btn-ondc-track" onclick="openOrderTracker(${index})">
+            <i class="ph-bold ph-map-pin"></i> Track Order
+          </button>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// =============================================================================
+// TRACKING MODAL ENGINE
+// =============================================================================
+window.openOrderTracker = function(orderIndex) {
+  const order = currentBuyerOrders[orderIndex];
+  if (!order) return;
+
+  const shortId = (order.id || '').substring(0, 8).toUpperCase();
+  const rawStatus = (order.status || 'Under Confirmation').trim();
+  const title = order.product_title || 'Craft Product';
+  const dest = order.buyer_address || (order.buyer_pincode ? `PIN: ${order.buyer_pincode}` : 'Destination Recorded');
+  const thumbUrl = resolveProductImage(order, catalogProductsCache);
+
+  document.getElementById('trackOrderId').textContent = `#ORD-${shortId}`;
+  document.getElementById('trackProductTitle').textContent = title;
+  document.getElementById('trackThumb').src = thumbUrl;
+  document.getElementById('trackDestAddress').textContent = dest;
+
+  let currentStep = 0;
+  if (rawStatus.toLowerCase().includes("confirmed") || rawStatus.toLowerCase().includes("escrow")) {
+    currentStep = 1;
+  } else if (rawStatus.toLowerCase().includes("shipped") || rawStatus.toLowerCase().includes("post") || rawStatus.toLowerCase().includes("dispatch")) {
+    currentStep = 2;
+  } else if (rawStatus.toLowerCase().includes("delivered") || rawStatus.toLowerCase().includes("settled")) {
+    currentStep = 3;
+  }
+
+  const stepper = document.getElementById('trackStepper');
+  const stepTitles = [
+    { label: "Under Review" },
+    { label: "Confirmed" },
+    { label: "Dispatched" },
+    { label: "Delivered" }
+  ];
+
+  stepper.innerHTML = `
+    <div class="step-connector ${currentStep >= 1 ? 'completed' : ''}" style="left: 12%; width: 25%;"></div>
+    <div class="step-connector ${currentStep >= 2 ? 'completed' : ''}" style="left: 37%; width: 25%;"></div>
+    <div class="step-connector ${currentStep >= 3 ? 'completed' : ''}" style="left: 62%; width: 25%;"></div>
+
+    ${stepTitles.map((s, idx) => {
+      const isDone = idx < currentStep;
+      const isCurrent = idx === currentStep;
+      let nodeClass = '';
+      if (isDone) nodeClass = 'completed';
+      if (isCurrent) nodeClass = 'current';
+
+      return `
+        <div class="step-node ${nodeClass}">
+          <div class="step-circle">
+            ${isDone ? '<i class="ph-bold ph-check"></i>' : (idx + 1)}
+          </div>
+          <span class="step-label">${s.label}</span>
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  const trackingNumber = `IN-POST-${(order.id || 'OD0912').substring(0, 6).toUpperCase()}`;
+  document.getElementById('trackCarrier').textContent = `Carrier: India Post Speed Post (${trackingNumber})`;
+
+  const timelineList = document.getElementById('trackTimelineList');
+  timelineList.innerHTML = `
+    <div class="timeline-item ${currentStep >= 0 ? (currentStep === 0 ? 'latest' : 'active') : ''}">
+      <div class="timeline-icon-wrap"><i class="ph-bold ph-receipt"></i></div>
+      <div>
+        <div class="timeline-item-title">Under Review (Escrow Order Created)</div>
+        <div class="timeline-item-desc">Order registered via Beckn protocol. MoSJE escrow verification initiated.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item ${currentStep >= 1 ? (currentStep === 1 ? 'latest' : 'active') : ''}">
+      <div class="timeline-icon-wrap"><i class="ph-bold ph-lock-key"></i></div>
+      <div>
+        <div class="timeline-item-title">Confirmed & Escrow Locked</div>
+        <div class="timeline-item-desc">Funds committed in escrow vault. Artisan notified to pack certified craft.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item ${currentStep >= 2 ? (currentStep === 2 ? 'latest' : 'active') : ''}">
+      <div class="timeline-icon-wrap"><i class="ph-bold ph-truck"></i></div>
+      <div>
+        <div class="timeline-item-title">Dispatched via India Post</div>
+        <div class="timeline-item-desc">Handed over to Speed Post hub. Consignment ID: <strong>${trackingNumber}</strong>.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item ${currentStep >= 3 ? 'latest active' : ''}">
+      <div class="timeline-icon-wrap"><i class="ph-bold ph-check-circle"></i></div>
+      <div>
+        <div class="timeline-item-title">Delivered & Disbursed</div>
+        <div class="timeline-item-desc">Package handed over to recipient. Escrow payout released to artisan's account.</div>
+      </div>
+    </div>
+  `;
+
+  openModal('trackingModal');
+};
+
+window.generateInvoiceModal = function(orderIndex) {
+  const order = currentBuyerOrders[orderIndex];
+  if (!order) return;
+  const shortId = (order.id || '').substring(0, 8).toUpperCase();
+  showToast(`Generating GST / Fair-Trade Tax Invoice for #ORD-${shortId}...`);
+};
+
+// =============================================================================
+// PROFILE VIEW
+// =============================================================================
+function renderProfileTab() {
+  const container = document.getElementById('profileContent');
+  if (!container) return;
+
+  if (!currentBuyerProfile) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px;">
+        <i class="ph-bold ph-user-circle" style="font-size: 64px; color: var(--primary-maroon);"></i>
+        <h3 style="margin: 12px 0 6px;">Cultural Patron Profile</h3>
+        <p style="color: var(--text-muted); margin-bottom: 18px;">Sign in with your mobile number to view orders and saved addresses.</p>
+        <button class="btn btn-maroon" onclick="openAuthModal('login')">Sign In / Register</button>
+      </div>
+    `;
+    return;
+  }
+
+  const name = currentBuyerProfile.full_name || "Cultural Patron";
+  const phone = currentBuyerProfile.phone || "";
+
+  container.innerHTML = `
+    <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-light);">
+      <div style="width: 72px; height: 72px; background: var(--primary-maroon); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; margin: 0 auto 12px;">
+        ${name.charAt(0).toUpperCase()}
+      </div>
+      <h2>${escapeHtml(name)}</h2>
+      <p style="color: var(--text-muted); font-size: 13px;">${escapeHtml(phone)}</p>
+      <span class="badge badge-gold" style="margin-top: 8px;">Role: Buyer / Patron</span>
+    </div>
+    <div style="padding: 20px 0;">
+      <h4 style="margin-bottom: 10px;">Default Delivery Address</h4>
+      <p style="font-size: 13px; color: var(--text-charcoal); background: var(--canvas-cream); padding: 12px; border-radius: 10px;">
+        ${escapeHtml(currentBuyerProfile.address || 'Craft Nagar, Lane 4, Bhubaneswar, Odisha')}<br>
+        PIN: ${escapeHtml(currentBuyerProfile.pincode || '751024')}
+      </p>
+    </div>
+    <button class="btn btn-outline btn-block" onclick="handleLogout()">Sign Out</button>
+  `;
+}
+
+// =============================================================================
+// CART & UTILITIES
+// =============================================================================
+window.addToCart = function(product) {
+  cartState.push(product);
+  updateCartUI();
+  showToast(`Added "${product.title}" to bag!`);
+  closeModal('productModal');
+};
+
+function updateCartUI() {
+  const badge = document.getElementById('cartCountBadge');
+  if (badge) badge.textContent = cartState.length;
+}
+
+window.openCartModal = function() {
+  const list = document.getElementById('cartItemsList');
+  const footer = document.getElementById('cartFooter');
+  if (!list || !footer) return;
+
+  if (cartState.length === 0) {
+    list.innerHTML = `<p style="text-align: center; padding: 30px; color: var(--text-muted);">Your shopping bag is empty.</p>`;
+    footer.innerHTML = '';
+  } else {
+    list.innerHTML = cartState.map((p, idx) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light);">
+        <div>
+          <strong>${escapeHtml(p.title)}</strong><br>
+          <small class="text-maroon">₹${p.price}</small>
+        </div>
+        <button class="btn-icon" onclick="removeCartItem(${idx})"><i class="ph ph-trash text-danger"></i></button>
+      </div>
+    `).join('');
+
+    const total = cartState.reduce((sum, item) => sum + Number(item.price || 0), 0);
+    footer.innerHTML = `
+      <div style="display: flex; justify-content: space-between; margin: 16px 0; font-size: 16px; font-weight: 800;">
+        <span>Total:</span>
+        <span class="text-maroon">₹${total}</span>
+      </div>
+      <button class="btn btn-maroon btn-block" onclick="checkoutFromCart()">Proceed to Checkout</button>
+    `;
+  }
+
+  openModal('cartModal');
+};
+
+window.removeCartItem = function(idx) {
+  cartState.splice(idx, 1);
+  updateCartUI();
+  openCartModal();
+};
+
+window.checkoutFromCart = function() {
+  closeModal('cartModal');
+  if (cartState.length > 0) {
+    requireAuthForPurchase(cartState[0]);
+  }
+};
+
+window.switchBuyerTab = function(tabName) {
+  document.querySelectorAll('.desktop-nav-links .nav-link-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+  document.querySelectorAll('.mobile-nav-bar .mobile-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+  document.querySelectorAll('.view-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `tab-${tabName}`);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.openModal = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+};
+
+window.closeModal = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+};
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 function escapeHtml(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
